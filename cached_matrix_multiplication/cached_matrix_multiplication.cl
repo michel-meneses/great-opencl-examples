@@ -3,8 +3,8 @@
  * by caching submatrices from those input matrices in the device local memory.
  */
 
-__kernel void multiplyMatricesWithCache(__constant int* a,
-                                    __constant int* b,
+__kernel void multiplyMatricesWithCache(__global int* a,
+                                    __global int* b,
                                     __global int* c,
                                     const int M,
                                     const int N, 
