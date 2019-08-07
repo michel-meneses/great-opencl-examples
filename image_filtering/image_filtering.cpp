@@ -12,29 +12,29 @@ using namespace cimg_library;
 // =================================================================
 
 void seqRgb2Gray(unsigned int imgWidth,
-                        unsigned int imgHeight,
-                        unsigned char *rChannel,
-                        unsigned char *gChannel,
-                        unsigned char *bChannel,
-                        unsigned char *grayImg);                    // Sequentially convert an RGB image to grayscale.
+                 unsigned int imgHeight,
+                 unsigned char *rChannel,
+                 unsigned char *gChannel,
+                 unsigned char *bChannel,
+                 unsigned char *grayImg);                          // Sequentially convert an RGB image to grayscale.
 
 void seqConvolve(unsigned int imgWidth,                     
-                            unsigned int imgHeight,
-                            unsigned int maskSize,
-                            unsigned char *inputImg,
-                            float *mask,
-                            unsigned char *outputImg);              // Sequentially convolve an image with a filter.
+                 unsigned int imgHeight,
+                 unsigned int maskSize,
+                 unsigned char *inputImg,
+                 float *mask,
+                 unsigned char *outputImg);                        // Sequentially convolve an image with a filter.
 
 void seqFilter(unsigned int imgWidth,                       
-                            unsigned int imgHeight,
-                            unsigned int lpMaskSize,
-                            unsigned int hpMaskSize,
-                            unsigned char *inputRchannel,
-                            unsigned char *inputGchannel,
-                            unsigned char *inputBchannel,
-                            float *lpMask,
-                            float *hpMask,
-                            unsigned char *outputImg);              // Sequentially filter an image.
+               unsigned int imgHeight,
+               unsigned int lpMaskSize,
+               unsigned int hpMaskSize,
+               unsigned char *inputRchannel,
+               unsigned char *inputGchannel,
+               unsigned char *inputBchannel,
+               float *lpMask,
+               float *hpMask,
+               unsigned char *outputImg);                           // Sequentially filter an image.
 
 bool checkEquality(unsigned char* img1, 
                     unsigned char* img2, 
@@ -52,15 +52,15 @@ cl::Device getDefaultDevice();                                    // Return a de
 void initializeDevice();                                          // Inicialize device and compile kernel code.
 
 void parFilter(unsigned int imgWidth,                       
-                            unsigned int imgHeight,
-                            unsigned int lpMaskSize,
-                            unsigned int hpMaskSize,
-                            unsigned char *inputRchannel,
-                            unsigned char *inputGchannel,
-                            unsigned char *inputBchannel,
-                            float *lpMask,
-                            float *hpMask,
-                            unsigned char *outputImg);             // Parallelly filter an image.
+               unsigned int imgHeight,
+               unsigned int lpMaskSize,
+               unsigned int hpMaskSize,
+               unsigned char *inputRchannel,
+               unsigned char *inputGchannel,
+               unsigned char *inputBchannel,
+               float *lpMask,
+               float *hpMask,
+               unsigned char *outputImg);                        // Parallelly filter an image.
 
 // =================================================================
 // ------------------------ Global Variables ------------------------
@@ -185,7 +185,39 @@ int main(){
  * */
 
 cl::Device getDefaultDevice(){
-    // CODE HERE !!!
+    
+    /**
+     * Search for all the OpenCL platforms available and check
+     * if there are any.
+     * */
+
+    std::vector<cl::Platform> platforms;
+    cl::Platform::get(&platforms);
+
+    if (platforms.empty()){
+        std::cerr << "No platforms found!" << std::endl;
+        exit(1);
+    }
+
+    /**
+     * Search for all the devices on the first platform 
+     * and check if there are any available.
+     * */
+
+    auto platform = platforms.front();
+    std::vector<cl::Device> devices;
+    platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
+
+    if (devices.empty()){
+        std::cerr << "No devices found!" << std::endl;
+        exit(1);
+    }
+
+    /**
+     * Return the first device found.
+     * */
+
+    return devices.front();
 }
 
 /**
@@ -193,7 +225,34 @@ cl::Device getDefaultDevice(){
  * */
 
 void initializeDevice(){
-    // CODE HERE !!!
+
+    /**
+     * Select the first available device.
+     * */
+
+    device = getDefaultDevice();
+    
+    /**
+     * Read OpenCL kernel file as a string.
+     * */
+
+    std::ifstream kernel_file("image_filtering.cl");
+    std::string src(std::istreambuf_iterator<char>(kernel_file), (std::istreambuf_iterator<char>()));
+
+    /**
+     * Compile kernel program which will run on the device.
+     * */
+
+    cl::Program::Sources sources(1, std::make_pair(src.c_str(), src.length() + 1));
+    context = cl::Context(device);
+    program = cl::Program(context, sources);
+    
+    auto err = program.build();
+    if(err != CL_BUILD_SUCCESS){
+        std::cerr << "Error!\nBuild Status: " << program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(device) 
+        << "\nBuild Log:\t " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
+        exit(1);
+    }
 }
 
 /**
@@ -201,16 +260,67 @@ void initializeDevice(){
  */
 
 void parFilter(unsigned int imgWidth,
-                            unsigned int imgHeight,
-                            unsigned int lpMaskSize,
-                            unsigned int hpMaskSize,
-                            unsigned char *inputRchannel,
-                            unsigned char *inputGchannel,
-                            unsigned char *inputBchannel,
-                            float *lpMask,
-                            float *hpMask,
-                            unsigned char *outputImg){
-    // CODE HERE !!!
+               unsigned int imgHeight,
+               unsigned int lpMaskSize,
+               unsigned int hpMaskSize,
+               unsigned char *inputRchannel,
+               unsigned char *inputGchannel,
+               unsigned char *inputBchannel,
+               float *lpMask,
+               float *hpMask,
+               unsigned char *outputImg){
+    
+    /**
+     * Create buffers and allocate memory on the device.
+     * */
+
+    cl::Buffer inputRchannelBuf(context, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR, imgWidth * imgHeight * sizeof(unsigned char), inputRchannel);
+    cl::Buffer inputGchannelBuf(context, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR, imgWidth * imgHeight * sizeof(unsigned char), inputGchannel);
+    cl::Buffer inputBchannelBuf(context, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR, imgWidth * imgHeight * sizeof(unsigned char), inputBchannel);
+    cl::Buffer grayOutputBuf(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, imgWidth * imgHeight * sizeof(unsigned char));
+    cl::Buffer lpMaskBuf(context, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR, lpMaskSize * lpMaskSize * sizeof(float), lpMask);
+    cl::Buffer hpMaskBuf(context, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS | CL_MEM_COPY_HOST_PTR, hpMaskSize * hpMaskSize * sizeof(float), hpMask);
+    cl::Buffer lpOutputBuf(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, imgWidth * imgHeight * sizeof(unsigned char));
+    cl::Buffer hpOutputBuf(context, CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY, imgWidth * imgHeight * sizeof(unsigned char));
+
+    /**
+     * Initialize grayscale kernel.
+     * */
+
+    cl::Kernel grayKernel(program, "rgb2gray");
+    grayKernel.setArg(0, inputRchannelBuf);
+    grayKernel.setArg(1, inputGchannelBuf);
+    grayKernel.setArg(2, inputBchannelBuf);
+    grayKernel.setArg(3, grayOutputBuf);
+
+    /**
+     * Initialize low-pass filter kernel.
+     * */
+    cl::Kernel lpKernel(program, "filterImageWithCache");
+    lpKernel.setArg(0, sizeof(unsigned int), &lpMaskSize);
+    lpKernel.setArg(1, grayOutputBuf);
+    lpKernel.setArg(2, lpMaskBuf);
+    lpKernel.setArg(3, lpOutputBuf);
+
+    /**
+     * Initialize high-pass filter kernel.
+     * */
+
+    cl::Kernel hpKernel(program, "filterImageWithCache");
+    hpKernel.setArg(0, sizeof(unsigned int), &hpMaskSize);
+    hpKernel.setArg(1, lpOutputBuf);
+    hpKernel.setArg(2, hpMaskBuf);
+    hpKernel.setArg(3, hpOutputBuf);
+
+    /**
+     * Execute kernel functions and collect the final result.
+     * */
+
+    cl::CommandQueue queue(context, device);
+    queue.enqueueNDRangeKernel(grayKernel, cl::NullRange, cl::NDRange(imgWidth, imgHeight));
+    queue.enqueueNDRangeKernel(lpKernel, cl::NullRange, cl::NDRange(imgWidth, imgHeight), cl::NDRange(16, 16));
+    queue.enqueueNDRangeKernel(hpKernel, cl::NullRange, cl::NDRange(imgWidth, imgHeight), cl::NDRange(16, 16));
+    queue.enqueueReadBuffer(hpOutputBuf, CL_TRUE, 0, imgWidth * imgHeight * sizeof(unsigned char), outputImg);
 }
 
 // =================================================================
@@ -222,11 +332,11 @@ void parFilter(unsigned int imgWidth,
  */
 
 void seqRgb2Gray(unsigned int imgWidth,
-                        unsigned int imgHeight,
-                        unsigned char *rChannel,
-                        unsigned char *gChannel,
-                        unsigned char *bChannel,
-                        unsigned char *grayImg){
+                 unsigned int imgHeight,
+                 unsigned char *rChannel,
+                 unsigned char *gChannel,
+                 unsigned char *bChannel,
+                 unsigned char *grayImg){
     
     /**
      * Declare the current index variable.
@@ -256,11 +366,11 @@ void seqRgb2Gray(unsigned int imgWidth,
  */
 
 void seqConvolve(unsigned int imgWidth,
-                            unsigned int imgHeight,
-                            unsigned int maskSize,
-                            unsigned char *inputImg,
-                            float *mask,
-                            unsigned char *outputImg){
+                 unsigned int imgHeight,
+                 unsigned int maskSize,
+                 unsigned char *inputImg,
+                 float *mask,
+                 unsigned char *outputImg){
     /**
      * Loop through input image.
      * */
@@ -315,15 +425,15 @@ void seqConvolve(unsigned int imgWidth,
  */
 
 void seqFilter(unsigned int imgWidth,
-                            unsigned int imgHeight,
-                            unsigned int lpMaskSize,
-                            unsigned int hpMaskSize,
-                            unsigned char *inputRchannel,
-                            unsigned char *inputGchannel,
-                            unsigned char *inputBchannel,
-                            float *lpMask,
-                            float *hpMask,
-                            unsigned char *outputImg){
+               unsigned int imgHeight,
+               unsigned int lpMaskSize,
+               unsigned int hpMaskSize,
+               unsigned char *inputRchannel,
+               unsigned char *inputGchannel,
+               unsigned char *inputBchannel,
+               float *lpMask,
+               float *hpMask,
+               unsigned char *outputImg){
 
     /**
      * Convert input image to grayscale.
