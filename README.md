@@ -17,7 +17,7 @@ The examples in this repository require a valid implementation of OpenCL in your
  - AMD: `sudo apt-get install amd-opencl-dev`
  - Nvidia: `sudo apt-get install nvidia-opencl-dev`
 
-### Windows/OSX
+### Windows
 
 The following instructions must be performed to install OpenCL on a Windows/OSX device:
 
@@ -45,7 +45,7 @@ This repository also provides the OpenCL source code of an image filtering appli
 
  1. K. O. W. Group. *The OpenCL Specification*. The Khronos Group, 2.2-10 edition, feb 2019. URL: https://www.khronos.org/registry/OpenCL/specs/2.2/pdf/OpenCL_API.pdf
  2. K. O. W. Group. *The OpenCL C++ 1.0 Specification*. The Khronos Group, 2.2-10 edition, feb 2019. URL: https://www.khronos.org/registry/OpenCL/specs/2.2/pdf/OpenCL_Cxx.pdf
- 3. Tschumperlé, D. *Introduction to The CImg Library*. CNRS UMR 6072 (GREYC) - Image Team. URL: http://cimg.eu/CImg_slides.pdf
+ 3. TschumperlÃ©, D. *Introduction to The CImg Library*. CNRS UMR 6072 (GREYC) - Image Team. URL: http://cimg.eu/CImg_slides.pdf
 
 ## License
 
